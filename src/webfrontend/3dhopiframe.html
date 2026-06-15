@@ -1,0 +1,147 @@
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <!--STYLESHEET-->
+  <link type="text/css" rel="stylesheet" href="3DHOP/minimal/stylesheet/3dhop.css"/>
+  <link type="text/css" rel="stylesheet" href="3DHOP/minimal/stylesheet/3dhop_panels.css"/>
+  <link type="text/css" rel="stylesheet" href="3dhop_ubhd.css"/>
+  <!--STYLESHEET which is also used by easydb -->
+  <link rel="stylesheet" type="text/css" href="/web/css/font-awesome/css/font-awesome.min.css">
+  <script type="text/javascript" src="3DHOP/minimal/js/spidergl.js"></script>
+  <!--JQUERY-->
+  <script type="text/javascript" src="3DHOP/minimal/js/jquery.js"></script>
+  <!--PRESENTER-->
+  <script type="text/javascript" src="3DHOP/minimal/js/presenter.js"></script>
+  <!--3D MODELS LOADING AND RENDERING-->
+  <script type="text/javascript" src="3DHOP/minimal/js/nexus.js"></script>
+  <script type="text/javascript" src="3DHOP/minimal/js/ply.js"></script>
+  <!--TRACKBALLS-->
+  <script type="text/javascript" src="3DHOP/minimal/js/trackball_sphere.js"></script>
+  <script type="text/javascript" src="3DHOP/minimal/js/trackball_turntable.js"></script>
+  <script type="text/javascript" src="3DHOP/minimal/js/trackball_turntable_pan.js"></script>
+  <script type="text/javascript" src="3DHOP/minimal/js/trackball_pantilt.js"></script>
+  <!--UTILITY-->
+  <script type="text/javascript" src="init_3dhop_easydb.js"></script>
+  <script type="text/javascript">
+    var presenter = null;
+    
+    function setup3dhop(isNexus,asseturl) {
+            presenter = new Presenter("draw-canvas");
+    
+            presenter.setScene({
+                    meshes: {
+                      "mesh1" : { url: asseturl, mType: isNexus == 1 ? 'nexus' : 'ply' }
+                    },
+                    modelInstances : {
+                      "Model1" : { mesh : "mesh1" }
+                    },
+                    trackball: {
+                      type: TurntablePanTrackball,
+                      trackOptions: {
+                        startPhi: 0.0,
+                        startTheta: 0.0,
+                        startDistance: 2.5,
+                        startPanX: 0.0,
+                        startPanY: 0.0,
+                        startPanZ: 0.0,
+                        minMaxPhi: [-180, 180],
+                        minMaxTheta: [-180, 180],
+                        minMaxDist: [0.1, 5.0],
+                        minMaxPanX: [-3.0, 3.0],
+                        minMaxPanY: [-1.5, 1.5],
+                        minMaxPanZ: [-1.0, 1.0]
+                      }
+                    }
+            });
+            presenter._onEndMeasurement = onEndMeasure;
+    }
+
+    function actionsToolbar(action) {
+	console.log('action',action)
+        if(action=='home') presenter.resetTrackball();
+        //--ZOOM--
+        else if(action=='zoomin') presenter.zoomIn();
+        else if(action=='zoomout') presenter.zoomOut();
+        //--ZOOM--
+        //--LIGHTING--
+        else if(action=='lighting' || action=='lighting_off') { presenter.enableSceneLighting(!presenter.isSceneLightingEnabled()); lightingSwitch(); }
+        //--LIGHTING--
+        //--LIGHT--
+        else if(action=='light' || action=='light_on') { presenter.enableLightTrackball(!presenter.isLightTrackballEnabled()); lightSwitch(); }
+        //--LIGHT--
+        //--MEASURE--
+        else if(action=='measure' || action=='measure_on') { presenter.enableMeasurementTool(!presenter.isMeasurementToolEnabled()); measureSwitch(); }
+        //--MEASURE--
+        //--HELP--
+        else if(action=='help' || action=='help_on') { showPanel('help_panel'); helpSwitch(); }
+        //--HELP--
+    }
+
+    function onEndMeasure(distance) {
+        var decimalClipper = 100; // 10 = 1 decimal, 100 = 2 decimals, 1000 = 3 decimals
+        $('#measure-output').html(Math.round(distance*decimalClipper)/decimalClipper);
+    }
+    
+    $(document).ready(function(){
+            var isNexus = window.location.search.substr(7,1)
+            var asseturl = window.location.search.substring(15);
+            init3dhop();
+            setup3dhop(isNexus,asseturl);
+    })
+  </script>
+</head>
+<body>
+  <div id="3dhop" class="tdhop" onmousedown="if (event.preventDefault) event.preventDefault()">
+    <div id="tdhlg"></div>
+    <div id="move" style="left: 20px; bottom: 30px; position: absolute; font-size: 10px; font-family: verdana; font-style: italic; color: #909090;">Use right mouse button to move the model.</div>
+
+      <table id="cover" onclick="$('#cover').css('display', 'none'); helpSwitch(false);">
+      <tr align="center"><td valign="center">
+      <!--HELP PANEL-->
+      <table class="panel" id="help_panel" cellspacing="10" onclick="event.stopPropagation();">
+      <tbody>
+      <tr><td colspan="6"><h3><img class="close_on" src="close_on.png" onclick="$('#cover').css('display', 'none'); helpSwitch(false);"/><img class="close" src="close.png"/>3DHOP Help</h3><hr></td></tr>
+      <tr><td colspan="2" style="width:33%;padding-bottom:0;">Rotate</td><td  colspan="2" style="width:33%;padding-bottom:0;">Zoom</td><td  colspan="2" style="width:33%;padding-bottom:0;">Pan</td></tr>
+      <tr><td colspan="2"><img src="left.png" width="30"/></td><td colspan="2"><img src="wheel.png" width="30"/></td><td colspan="2"><img src="right.png" width="30"/></td></tr>
+      <tr><td colspan="2" style="padding-top:0;">Left Button + Move</td><td colspan="2" style="padding-top:0;">Mouse Wheel</td><td colspan="2" style="padding-top:0;">Right Button + Move</td></tr>
+      <tr><td colspan="6"><hr></td></tr>
+      
+      <tr><td style="width:15%"><div class="toolhelp"><span class="fa fa-home"></span></div></td><td colspan="2" style="width:30%">Reset View</td><td style="width:15%"><div class="toolhelp"><span class="fa fa-lightbulb-o" ></span></div></td><td colspan="2" style="width:30%">Toggle Light Control</td></tr>
+      <tr><td><div class="toolhelp"><span class="fa fa-search-plus"></span></div></td><td colspan="2">Zoom In</td><td><div class="toolhelp"><span class="fa fa-search-minus"></span></div></td><td colspan="2">Zoom Out</td></tr>
+      <tr><td><div class="toolhelp"><span class="fa fa-calculator"></span></div></td><td colspan="2">Toggle Measure Tool</td><td></td><td colspan="2"></td></tr>
+      <tr><td colspan="6"></td></tr>
+      </tbody>
+      </table>
+      <!--HELP PANEL ENDS-->
+      </td></tr>
+      </table>
+
+    <div id="toolbar">
+      <!--HOME-->
+      <div id="home" title="Home"><span class="fa fa-home"></span></div>
+      <!--ZOOM-->
+      <div id="zoomin" title="Zoom In"><span class="fa fa-search-plus"></span></div>
+      <div id="zoomout" title="Zoom Out"><span class="fa fa-search-minus"></span></div>
+      <!--ZOOM-->
+      <!--LIGHT-->
+      <div id="light_on" title="Disable Light Control" style="position:absolute; visibility:hidden; color: #F8F800; font-weight: bold; background-color: #C0C0C0;"><span class="fa fa-lightbulb-o" ></span></div>
+      <div id="light" title="Enable Light Control"><span class="fa fa-lightbulb-o"></span></div>
+      <!--LIGHT-->
+      <!--MEASURE-->
+      <div id="measure_on" title="Disable Measure Tool" style="position:absolute; visibility:hidden; color: #F8F800; font-weight: bold; background-color: #C0C0C0;"><span class="fa fa-calculator" ></span></div>
+      <div id="measure" title="Enable Measure Tool"><span class="fa fa-calculator"></span></div>
+      <!--MEASURE-->
+      <!--HELP-->
+      <div id="help_on" title="Hide Help" style="position:absolute; visibility:hidden; color: #F8F800; font-weight: bold; background-color: #C0C0C0;"><span class="fa fa-question"></span></div>
+      <div id="help" title="Show Help"><span class="fa fa-question"></span></div>
+      <!--HELP-->
+    </div>
+
+    <div id="measure-box" class="output-box">
+        Measured length<hr/>
+        <span id="measure-output" class="output-text" onmousedown="event.stopPropagation()">0.0</span>
+    </div>
+    <canvas id="draw-canvas"/>
+  </div>
+</body>
+</html>
