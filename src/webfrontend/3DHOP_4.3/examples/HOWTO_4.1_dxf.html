@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DXF Viewer Embed Demo</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./dxf-viewer/node_modules/three/build/three.module.js",
+          "three/": "./dxf-viewer/node_modules/three/",
+          "earcut": "./dxf-viewer/node_modules/earcut/src/earcut.js",
+          "loglevel": "./dxf-viewer/shims/loglevel.js",
+          "opentype.js": "./dxf-viewer/node_modules/opentype.js/dist/opentype.module.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --panel: #ffffff;
+        --text: #1f2937;
+        --muted: #667085;
+        --border: #e5e7eb;
+        --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+        --accent: #111827;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg);
+      }
+
+      body {
+        color: var(--text);
+        font-family: "Futura", sans-serif;
+        line-height: 1.5;
+      }
+
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 20px 40px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: "Futura", serif;
+        font-size: clamp(2rem, 4vw, 3.2rem);
+        line-height: 1.05;
+        color: var(--accent);
+      }
+
+      .lede {
+        max-width: 60ch;
+        margin: 0;
+        font-size: 1rem;
+        color: var(--muted);
+      }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 14px 16px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+        min-width: 220px;
+      }
+
+      .field label {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .field select,
+      .reload-btn {
+        height: 44px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        font: inherit;
+      }
+
+      .field select {
+        min-width: 240px;
+        padding: 0 14px;
+        background: #fff;
+        color: var(--text);
+      }
+
+      .reload-btn {
+        padding: 0 18px;
+        border-color: #111827;
+        background: #111827;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+      }
+
+      .reload-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(17, 24, 39, 0.18);
+      }
+
+      .reload-btn:disabled {
+        opacity: 0.6;
+        cursor: progress;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .viewer-shell {
+        overflow: hidden;
+        min-height: min(72vh, 780px);
+      }
+
+      .viewer-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 18px 0;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      #viewer {
+        width: 100%;
+        min-height: min(72vh, 780px);
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          padding: 20px 14px 28px;
+        }
+
+        .controls {
+          align-items: stretch;
+        }
+
+        .field,
+        .field select,
+        .reload-btn {
+          width: 100%;
+          min-width: 0;
+        }
+
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>DXF Viewer</h1>
+              </section>
+
+      <section class="panel controls" aria-label="DXF controls">
+        <div class="field">
+          <label for="fileSelect">Select DXF</label>
+          <select id="fileSelect">
+            <option value="./models/REN19N.dxf">REN19N.dxf</option>
+            <option value="./models/REN29A.dxf">REN29A.dxf</option>
+          </select>
+        </div>
+        <button class="reload-btn" id="reloadBtn" type="button">Reload</button>
+
+      </section>
+
+      <section class="panel viewer-shell">
+
+        <div id="viewer"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { DxfViewer } from "./dxf-viewer/src/index.js";
+
+      const fileSelect = document.getElementById("fileSelect");
+      const reloadBtn = document.getElementById("reloadBtn");
+      const viewerContainer = document.getElementById("viewer");
+
+      let viewer = null;
+      let loadToken = 0;
+
+
+
+      async function loadSelectedDxf() {
+        const token = ++loadToken;
+        const url = fileSelect.value;
+
+        reloadBtn.disabled = true;
+      
+        try {
+          if (!viewer) {
+            viewer = new DxfViewer(viewerContainer, { autoResize: true });
+            viewer.clearColor = 0xffffff;
+            if (viewer.renderer) {
+              viewer.renderer.setClearColor(0xffffff, 1);
+            }
+          }
+
+          await viewer.Load({ url });
+
+          if (token === loadToken) {
+            viewer.clearColor = 0xffffff;
+            if (viewer.renderer) {
+              viewer.renderer.setClearColor(0xffffff, 1);
+            }
+
+          }
+        } catch (error) {
+          console.error(error);
+          if (token === loadToken) {
+
+          }
+        } finally {
+          if (token === loadToken) {
+            reloadBtn.disabled = false;
+          }
+        }
+      }
+
+      reloadBtn.addEventListener("click", loadSelectedDxf);
+      fileSelect.addEventListener("change", loadSelectedDxf);
+      loadSelectedDxf();
+    </script>
+  </body>
+</html>
