@@ -23,6 +23,7 @@
         "CONTRIBUTING.md"
     ],
     "dependencies": {
+        "dwgdxf": "^1.0.5",
         "dxf-viewer": "^1.0.48",
         "earcut": "^3.0.0",
         "loglevel": "^1.9.1",

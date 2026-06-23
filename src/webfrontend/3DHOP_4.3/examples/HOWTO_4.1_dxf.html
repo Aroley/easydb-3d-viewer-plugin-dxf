@@ -10,6 +10,7 @@
           "three": "./dxf-viewer/node_modules/three/build/three.module.js",
           "three/": "./dxf-viewer/node_modules/three/",
           "earcut": "./dxf-viewer/node_modules/earcut/src/earcut.js",
+          "dwgdxf": "./dxf-viewer/node_modules/dwgdxf/dist/index.js",
           "loglevel": "./dxf-viewer/shims/loglevel.js",
           "opentype.js": "./dxf-viewer/node_modules/opentype.js/dist/opentype.module.js"
         }
@@ -114,6 +115,24 @@
         color: var(--text);
       }
 
+      .field input[type="file"] {
+        width: 100%;
+        min-width: 280px;
+        padding: 10px 12px;
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        background: #f9fafb;
+        color: var(--muted);
+        font: inherit;
+      }
+
+      .status {
+        min-height: 1.5em;
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
       .reload-btn {
         padding: 0 18px;
         border-color: #111827;
@@ -179,7 +198,9 @@
     <main class="page">
       <section class="hero">
         <h1>DXF Viewer</h1>
-              </section>
+      </section>
+
+      <p class="status" id="status" aria-live="polite"></p>
 
       <section class="panel controls" aria-label="DXF controls">
         <div class="field">
@@ -188,6 +209,10 @@
             <option value="./models/REN19N.dxf">REN19N.dxf</option>
             <option value="./models/REN29A.dxf">REN29A.dxf</option>
           </select>
+        </div>
+        <div class="field">
+          <label for="fileUpload">Upload DXF or DWG</label>
+          <input id="fileUpload" type="file" accept=".dxf,.dwg" />
         </div>
         <button class="reload-btn" id="reloadBtn" type="button">Reload</button>
 
@@ -201,19 +226,115 @@
 
     <script type="module">
       import { DxfViewer } from "./dxf-viewer/src/index.js";
+      import { convertDwgToDxf, init as initDwgConverter } from "dwgdxf";
 
       const fileSelect = document.getElementById("fileSelect");
+      const fileUpload = document.getElementById("fileUpload");
       const reloadBtn = document.getElementById("reloadBtn");
       const viewerContainer = document.getElementById("viewer");
+      const status = document.getElementById("status");
 
       let viewer = null;
       let loadToken = 0;
+      let uploadedFile = null;
+      let dwgConverterReady = false;
+      let dwgConverterInitPromise = null;
+
+      function setStatus(message) {
+        status.textContent = message || "";
+      }
+
+      async function ensureDwgConverterReady() {
+        if (dwgConverterReady) {
+          return;
+        }
+
+        if (!dwgConverterInitPromise) {
+          setStatus("Preparing DWG converter...");
+          dwgConverterInitPromise = initDwgConverter()
+            .then(() => {
+              dwgConverterReady = true;
+            })
+            .finally(() => {
+              dwgConverterInitPromise = null;
+            });
+        }
+
+        await dwgConverterInitPromise;
+      }
+
+      async function readUploadedDxf(file) {
+        const extension = file.name.split(".").pop().toLowerCase();
+        const sourceBytes = new Uint8Array(await file.arrayBuffer());
+
+        if (extension === "dwg") {
+          await ensureDwgConverterReady();
+          setStatus(`Converting ${file.name} from DWG to DXF...`);
+          return convertDwgToDxf(sourceBytes);
+        }
+
+        return sourceBytes;
+      }
+
+      async function loadUploadedFile() {
+        if (!uploadedFile) {
+          return;
+        }
+
+        const token = ++loadToken;
+        reloadBtn.disabled = true;
+
+        try {
+          if (!viewer) {
+            viewer = new DxfViewer(viewerContainer, { autoResize: true });
+            viewer.clearColor = 0xffffff;
+            if (viewer.renderer) {
+              viewer.renderer.setClearColor(0xffffff, 1);
+            }
+          }
+
+          const dxfBytes = await readUploadedDxf(uploadedFile);
+          if (token !== loadToken) {
+            return;
+          }
+
+          setStatus(`Loading ${uploadedFile.name}...`);
+          const blob = new Blob([dxfBytes], { type: "application/dxf" });
+          const objectUrl = URL.createObjectURL(blob);
+
+          try {
+            await viewer.Load({ url: objectUrl });
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
+
+          if (token === loadToken) {
+            viewer.clearColor = 0xffffff;
+            if (viewer.renderer) {
+              viewer.renderer.setClearColor(0xffffff, 1);
+            }
+            setStatus(`Viewing ${uploadedFile.name}`);
+          }
+        } catch (error) {
+          console.error(error);
+          if (token === loadToken) {
+            setStatus(`Failed to load ${uploadedFile.name}`);
+          }
+        } finally {
+          if (token === loadToken) {
+            reloadBtn.disabled = false;
+          }
+        }
+      }
 
 
 
       async function loadSelectedDxf() {
         const token = ++loadToken;
         const url = fileSelect.value;
+        uploadedFile = null;
+        fileUpload.value = "";
+        setStatus(`Loading ${url.split("/").pop()}...`);
 
         reloadBtn.disabled = true;
       
@@ -233,12 +354,13 @@
             if (viewer.renderer) {
               viewer.renderer.setClearColor(0xffffff, 1);
             }
+            setStatus(`Viewing ${url.split("/").pop()}`);
 
           }
         } catch (error) {
           console.error(error);
           if (token === loadToken) {
-
+            setStatus(`Failed to load ${url.split("/").pop()}`);
           }
         } finally {
           if (token === loadToken) {
@@ -246,6 +368,17 @@
           }
         }
       }
+
+      fileUpload.addEventListener("change", () => {
+        const file = fileUpload.files && fileUpload.files[0] ? fileUpload.files[0] : null;
+        if (!file) {
+          return;
+        }
+
+        uploadedFile = file;
+        fileSelect.value = "";
+        loadUploadedFile();
+      });
 
       reloadBtn.addEventListener("click", loadSelectedDxf);
       fileSelect.addEventListener("change", loadSelectedDxf);
